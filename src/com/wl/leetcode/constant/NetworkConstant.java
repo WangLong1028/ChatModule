@@ -23,6 +23,8 @@ public class NetworkConstant {
     public static final String REQUEST_HEADER_CHAT_SEND = "REQUEST_HEADER_CHAT_SEND";
     public static final String REQUEST_HEADER_REQUEST_USER = "REQUEST_HEADER_REQUEST_USER";
     public static final String REQUEST_HEADER_REQUEST_HISTORY = "REQUEST_HEADER_REQUEST_HISTORY";
+    public static final String REQUEST_HEADER_POST_HEADSHOT_PIC = "REQUEST_HEADER_POST_HEADSHOT_PIC";
+    public static final String REQUEST_HEADER_POST_CHAT_PIC = "REQUEST_HEADER_POST_CHAT_PIC";
 
     // 注册相关常量
     public static final String SIGN_UP_SUCCESS = "SIGN_UP_SUCCESS";
@@ -46,6 +48,10 @@ public class NetworkConstant {
     public static final String CHAT_SEND_SUCCESS = "CHAT_SEND_SUCCESS";
     public static final String ACCESS_CHAT = "ACCESS_CHAT";
 
+    // 文件上传相关常量
+    public static final String ACCESS_POST = "ACCESS_POST";
+    public static final String UPLOAD_SUCCESS = "UPLOAD_SUCCESS";
+    public static final String UPLOAD_FAILED = "UPLOAD_FAILED";
 
     // 通用返回码
     public static final String DATA_ILLEGAL_ERROR = "DATA_ILLEGAL_ERROR";

@@ -1,6 +1,7 @@
 package com.wl.leetcode.login;
 
 import com.wl.leetcode.constant.NetworkConstant;
+import com.wl.leetcode.files.UploadHeadshotModel;
 import com.wl.leetcode.helper.SocketHelper;
 
 import java.io.IOException;
@@ -14,9 +15,9 @@ public class SignUpModel {
         this.signUpResultCallback = signUpResultCallback;
     }
 
-    public void SignUp(String userName, String password, String secureProblem, String secureAns, int headshot) {
+    public void SignUp(String userName, String password, String secureProblem, String secureAns, String headshot) {
         // 先检查数据合法性
-        if (userName.equals("null") || password.equals("null") || secureProblem.equals("null") || secureAns.equals("null")){
+        if (userName.equals("null") || password.equals("null") || secureProblem.equals("null") || secureAns.equals("null")) {
             // 数据不合法
             signFailed(NetworkConstant.DATA_ILLEGAL_ERROR);
             return;
@@ -25,25 +26,36 @@ public class SignUpModel {
             // 连接服务器
             Socket socket = new Socket(NetworkConstant.SERVER_IP, NetworkConstant.SERVER_PORT);
             // 整合数据
-            String data = combineData(userName, password, secureProblem, secureAns, headshot);
+            String data = combineData(userName, password, secureProblem, secureAns);
             // 将数据发给服务器
             SocketHelper.sendMsg(socket, data);
             // 得到服务器消息
             String signUpResult = SocketHelper.getMsg(socket);
-            if (signUpResult == null){
+            if (signUpResult == null) {
                 // 说明与服务器通讯失败
                 signFailed(NetworkConstant.CONNECT_ERROR);
                 socket.close();
                 return;
             }
-            if (!signUpResult.equals(NetworkConstant.SIGN_UP_SUCCESS)){
+            String[] code = signUpResult.split("#");
+            if (!code[0].equals(NetworkConstant.SIGN_UP_SUCCESS)) {
                 // 注册失败
                 signFailed(signUpResult);
                 socket.close();
                 return;
             }
+
             // 注册成功
             signUpSuccess();
+
+            // 上传头像
+            uploading();
+            if (SocketHelper.uploadHeadshotPic(socket, Integer.parseInt(code[1]), headshot)) {
+                uploadSuccess();
+            } else {
+                uploadFailed();
+            }
+
             socket.close();
         } catch (IOException e) {
             signFailed(NetworkConstant.CONNECT_ERROR);
@@ -52,13 +64,30 @@ public class SignUpModel {
     }
 
     // 整合数据方法
-    private String combineData(String userName, String password, String secureProblem, String secureAns, int headshot) {
+    private String combineData(String userName, String password, String secureProblem, String secureAns) {
         String header = NetworkConstant.REQUEST_HEADER_SIGN_UP;
         String body = userName + NetworkConstant.DATA_SEPARATOR + password + NetworkConstant.DATA_SEPARATOR + secureProblem
-                + NetworkConstant.DATA_SEPARATOR + secureAns + NetworkConstant.DATA_SEPARATOR + headshot;
+                + NetworkConstant.DATA_SEPARATOR + secureAns;
         return header + NetworkConstant.REQUEST_SEPARATOR + body;
     }
 
+    public void uploading() {
+        if (signUpResultCallback != null) {
+            signUpResultCallback.uploadingHeadshot();
+        }
+    }
+
+    public void uploadSuccess() {
+        if (signUpResultCallback != null) {
+            signUpResultCallback.uploadHeadshotSuccess();
+        }
+    }
+
+    public void uploadFailed() {
+        if (signUpResultCallback != null) {
+            signUpResultCallback.uploadHeadshotFailed();
+        }
+    }
 
     public void signUpSuccess() {
         if (signUpResultCallback != null) {
@@ -83,5 +112,11 @@ public class SignUpModel {
         void signUpSuccess();
 
         void signUpFailed(String failedMsg);
+
+        void uploadingHeadshot();
+
+        void uploadHeadshotSuccess();
+
+        void uploadHeadshotFailed();
     }
 }

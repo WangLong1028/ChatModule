@@ -18,7 +18,7 @@ public class SignUpView implements SignUpModel.SignUpResultCallback {
             String secureProblem = scanner.next();
             System.out.println("请输入答案");
             String secureAns = scanner.next();
-            signUpModel.SignUp(userName, password, secureProblem, secureAns, 0);
+            signUpModel.SignUp(userName, password, secureProblem, secureAns, "D:/Test/test2.jpg");
         }
     }
 
@@ -30,5 +30,20 @@ public class SignUpView implements SignUpModel.SignUpResultCallback {
     @Override
     public void signUpFailed(String failedMsg) {
         System.err.println("注册失败 : " + failedMsg);
+    }
+
+    @Override
+    public void uploadingHeadshot() {
+        System.out.println("上传头像中...");
+    }
+
+    @Override
+    public void uploadHeadshotSuccess() {
+        System.out.println("上传成功!");
+    }
+
+    @Override
+    public void uploadHeadshotFailed() {
+        System.err.println("上传失败!");
     }
 }

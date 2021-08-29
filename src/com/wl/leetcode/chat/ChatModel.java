@@ -1,5 +1,6 @@
 package com.wl.leetcode.chat;
 
+import com.alibaba.fastjson.JSON;
 import com.wl.leetcode.chatdata.ChatBean;
 import com.wl.leetcode.chatdata.UserBean;
 import com.wl.leetcode.constant.NetworkConstant;
@@ -11,7 +12,7 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.TimeOutDealer{
+public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.TimeOutDealer, ChatBeanSender.ChatSendResult {
 
     private final ChattingRecordGetter chattingRecordGetter;
 
@@ -20,6 +21,9 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
     private Socket socket;
 
     private static final String TAG_LOGIN = "TAG_LOGIN";
+
+    private ChatBeanSender chatBeanSender;
+
 
     public ChatModel(ChattingRecordGetter chattingRecordGetter) {
         this.chattingRecordGetter = chattingRecordGetter;
@@ -49,7 +53,7 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
         SocketHelper.sendMsg(socket, NetworkConstant.REQUEST_HEADER_CHAT_CLIENT_LOGIN);
     }
 
-    private void initTimeOutPool(){
+    private void initTimeOutPool() {
         timeOutPool = new TimeOutPool();
     }
 
@@ -59,16 +63,11 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
     }
 
     public void send(ChatBean msg) {
-        // 整合数据
-        String data = combineData(msg);
-        // 发送数据
-        SocketHelper.sendMsg(socket, data);
-    }
-
-    private String combineData(ChatBean chatBean) {
-        String header = NetworkConstant.REQUEST_HEADER_CHAT_SEND;
-        String body = chatBean.getContentText() + NetworkConstant.DATA_SEPARATOR + chatBean.getBelongUser().getId();
-        return header + NetworkConstant.REQUEST_SEPARATOR + body;
+        //msg.setPicPath("D:/Test/test.jpg");
+        // 判断是否要发送图片
+        chatBeanSender = null;
+        chatBeanSender = new ChatBeanSender(socket, this);
+        chatBeanSender.send(msg);
     }
 
     @Override
@@ -79,6 +78,12 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
             chattingRecordGetter.connectingToServerSuccess();
             return;
         }
+
+        // 信息发送器检查结果
+        if (chatBeanSender != null) {
+            chatBeanSender.handleMsg(msg);
+        }
+
         // 判断数据类型
         String[] data = msg.split(NetworkConstant.CHAT_MODE_SEPARATOR);
         String prefix = data[0];
@@ -89,7 +94,7 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
             handleReceive(data[1]);
         }
         if (prefix.equals(NetworkConstant.PREFIX_MODE_GET_HISTORY)) {
-            if(data.length == 1){
+            if (data.length == 1) {
                 handleChatHistory(null);
                 return;
             }
@@ -98,9 +103,14 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
     }
 
     private void handleSend(String sendResult) {
-        if (sendResult == null || !sendResult.equals(NetworkConstant.CHAT_SEND_SUCCESS)) {
+        if (sendResult == null) {
+            sendError(NetworkConstant.CONNECT_ERROR);
+            return;
+        }
+        String[] code = sendResult.split("#");
+        if (!code[0].equals(NetworkConstant.CHAT_SEND_SUCCESS)) {
             // 发送失败
-            sendError(sendResult == null ? NetworkConstant.CONNECT_ERROR : sendResult);
+            sendError(sendResult);
             return;
         }
         // 发送成功
@@ -108,7 +118,7 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
     }
 
     private void handleReceive(String data) {
-        ChatBean chatBean = parseChatData(data);
+        ChatBean chatBean = JSON.parseObject(data, ChatBean.class);
         if (chatBean == null) {
             // 数据异常
             receiveError(NetworkConstant.DATA_ILLEGAL_ERROR);
@@ -118,45 +128,19 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
     }
 
     private void handleChatHistory(String data) {
-        if(chattingRecordGetter == null){
+        if (chattingRecordGetter == null) {
             return;
         }
         if (data == null) {
             chattingRecordGetter.getHistoryMsg(new ArrayList<>());
             return;
         }
-        String[] chatBeanDatas = data.split(NetworkConstant.CHAT_BEAN_SEPARATOR);
-        List<ChatBean> chatBeans = new ArrayList<>();
-        for (String chatBeanData : chatBeanDatas) {
-            ChatBean chatBean = parseChatData(chatBeanData);
-            if(chatBean == null){
-                continue;
-            }
-            chatBeans.add(chatBean);
-        }
+        List<ChatBean> chatBeans = JSON.parseArray(data, ChatBean.class);
         chattingRecordGetter.getHistoryMsg(chatBeans);
     }
 
-    private ChatBean parseChatData(String data) {
-        String[] chatData = data.split(NetworkConstant.CHAT_RECEIVE_CHAT_BEAN_ATTRIBUTE_SEPARATOR);
-        if (chatData.length != 4) {
-            return null;
-        }
-
-        int chatId = Integer.parseInt(chatData[0]);
-        String contentText = chatData[1];
-        int userId = Integer.parseInt(chatData[2]);
-        String userName = SocketHelper.decodeMsg(chatData[3]);
-
-        UserBean userBean = new UserBean(userId, userName, 0);
-        ChatBean chatBean = new ChatBean(contentText, userBean);
-        chatBean.setId(chatId);
-
-        return chatBean;
-    }
-
-    public void timeOut(String tag){
-        if(tag.equals(TAG_LOGIN)){
+    public void timeOut(String tag) {
+        if (tag.equals(TAG_LOGIN)) {
             chattingRecordGetter.connectingToServerTimeOut();
         }
     }
@@ -185,6 +169,11 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
         }
     }
 
+    @Override
+    public void sendFailed(String msg) {
+        sendError(msg);
+    }
+
     private void sendError(String errorMsg) {
         if (chattingRecordGetter == null) {
             return;
@@ -192,7 +181,8 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
         chattingRecordGetter.sendError(errorMsg);
     }
 
-    private void sendSuccess() {
+    @Override
+    public void sendSuccess() {
         if (chattingRecordGetter == null) {
             return;
         }
@@ -230,5 +220,7 @@ public class ChatModel implements ReceiveThread.ReceiveManager, TimeOutPool.Time
         void sendError(String errorMsg);
 
         void sendSuccess();
+
+        void sendPicError();
     }
 }

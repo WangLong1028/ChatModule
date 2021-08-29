@@ -4,6 +4,8 @@ public class ChatBean {
     private  int id;
     private String contentText;
     private UserBean belongUser;
+    private String picPath;
+    private String chatPicImg;
 
     public ChatBean() {
     }
@@ -35,5 +37,21 @@ public class ChatBean {
 
     public void setId(int id) {
         this.id = id;
+    }
+
+    public String getPicPath() {
+        return picPath;
+    }
+
+    public void setPicPath(String picPath) {
+        this.picPath = picPath;
+    }
+
+    public String getChatPicImg() {
+        return chatPicImg;
+    }
+
+    public void setChatPicImg(String chatPicImg) {
+        this.chatPicImg = chatPicImg;
     }
 }
